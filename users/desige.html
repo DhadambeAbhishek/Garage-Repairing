@@ -1,0 +1,212 @@
+<?php
+session_start();
+include("../database/db_connect.php");
+include('functions.php');
+// If session is set
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: ../index.php"); // Use "../" if file is inside "user/" folder
+    exit();
+}
+// Check if an ID was passed
+if (isset($_GET['id'])) {
+    $partId = $_GET['id'];
+    
+    // Fetch the current part data from the database
+    $sql = "SELECT * FROM inventory WHERE id = ?";
+    $stmt = $mysqli->prepare($sql);
+    $stmt->bind_param('i', $partId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    // If the part exists
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+    } else {
+        // Redirect if no part found
+        header("Location: admin_inventory.php");
+        exit();
+    }
+} else {
+    // Redirect if no ID passed
+    header("Location: admin_inventory.php");
+    exit();
+}                                                                                                                                                                                if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['delete_part'])) {
+        // Delete action
+        $deleteSql = "DELETE FROM inventory WHERE id = ?";
+        $deleteStmt = $mysqli->prepare($deleteSql);
+        $deleteStmt->bind_param('i', $partId);
+
+        if ($deleteStmt->execute()) {
+            header("Location: admin_inventory.php?deleted=1");
+            exit();
+        } else {
+            echo "<script>alert('❌ Failed to delete part.');</script>";
+        }
+    } else {
+        // Update quantity action
+        $newQuantity = $_POST['quantity'];
+
+        $updateSql = "UPDATE inventory SET quantity = ? WHERE id = ?";
+        $updateStmt = $mysqli->prepare($updateSql);
+        $updateStmt->bind_param('ii', $newQuantity, $partId);
+        $updateStmt->execute();
+
+        header("Location: admin_inventory.php");
+        exit();
+    }
+}
+
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Stock</title>
+    <style>
+        /* Include the CSS from above here */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7fc;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            width: 80%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px;
+            background-color: #fff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        label {
+            font-weight: bold;
+            font-size: 14px;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:disabled,
+        input[type="number"]:disabled {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+        }
+
+        input[type="number"] {
+            max-width: 150px;
+        }
+
+        input[type="submit"] {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                width: 90%;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            input[type="submit"] {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <?php include("adm_navbar.php"); ?>
+    <div class="content">
+        <h1>Update Stock for Part:
+            <?php echo htmlspecialchars($row['part_name']); ?>
+        </h1>
+
+        <form method="POST" action="updatestock.php?id=<?php echo $row['id']; ?>">
+            <label for="part_name">Part Name:</label>
+            <input type="text" name="part_name" value="<?php echo htmlspecialchars($row['part_name']); ?>" disabled><br>
+
+            <label for="part_type">Part Type:</label>
+            <input type="text" name="part_type" value="<?php echo htmlspecialchars($row['part_type']); ?>" disabled><br>
+
+            <label for="brand">Brand:</label>
+            <input type="text" name="brand" value="<?php echo htmlspecialchars($row['brand']); ?>" disabled><br>
+
+            <label for="model">Model:</label>
+            <input type="text" name="model" value="<?php echo htmlspecialchars($row['model']); ?>" disabled><br>
+
+            <label for="material">Material:</label>
+            <input type="text" name="material" value="<?php echo htmlspecialchars($row['material']); ?>" disabled><br>
+
+            <label for="quantity">Current Quantity:
+                <?php echo $row['quantity']; ?>
+            </label><br>
+            <label for="quantity">New Quantity:</label>
+            <input type="number" name="quantity" value="<?php echo $row['quantity']; ?>" required><br>
+
+            <input type="submit" value="Update Quantity">
+            <br>
+            <button type="submit" name="delete_part"
+                style="background-color: #dc3545; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer;"
+                onclick="return confirm('Are you sure you want to delete this part? This action cannot be undone.')">🗑️
+                Delete Part</button>
+
+        </form>
+
+        <a href="admin_inventory.php">Back to Inventory List</a>
+    </div>
+</body>
+
+</html>
